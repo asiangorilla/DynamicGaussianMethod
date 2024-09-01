@@ -1,4 +1,5 @@
-Dynamic Gaussian method of moving Gaussian.
+<h1>Dynamic Gaussian method of moving Gaussian.
+</h1>
 
 Execute over commandline with 'python main.py [OPTION]'
 
@@ -16,6 +17,10 @@ For each training option, the hyperparameters are already preset to 200 epochs. 
 For the training options, for each time step iteration, as described in the paper, the images are rendered and saved in the train_pics folder.<br />
 Similarly for the testing option, the rendered images are saved in the test_pics folder.<br />
 <br />
-For this github, the data and 
+<h1>Prerequisites</h1>
+This code and project has as its foundation the Dynamic 3D Gaussian method introduced by Luiten etal. Their code can be seen here:<a href="https://github.com/JonathonLuiten/Dynamic3DGaussians"> Dynamic 3D Gaussians</a> <br />
+
+We have not uploaded the raw data for the Panoptics basketball dataset. The basketball dataset can be downloaded from the Dynamic 3D Gaussians GitHub. Add the dynamic_data Folder. <br />
+Our dependencies can be seen in the environment.yml file. This file can be used to set up an anaconda environment. For the rendering, we used the diff-gauss-rasterization-w-depth library. This setup of this library is also described in the Dynamic 3D Gaussians repository.
     
 
