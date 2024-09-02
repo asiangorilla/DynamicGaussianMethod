@@ -55,7 +55,8 @@ class trainer:
         oy = aw * by - ax * bz + ay * bw + az * bx
         oz = aw * bz + ax * by - ay * bx + az * bw
         return torch.stack((ow, ox, oy, oz), -1)
-    def loss_after_init(self, params, curr_data, variables):
+    def loss_after_init(self, params, curr_data, variables):  # change of the loss function after using initialization iteration
+                                                              # new loss function only calculates l1 loss.
         losses = {}
 
         rendervar = params2rendervar(params)
@@ -70,27 +71,8 @@ class trainer:
         loss = loss_weights['im'] * losses['im']
         return loss, variables
 
-    def extract_image_data(self, image_path):
-        image = Image.open(image_path)
-        width, height = image.size
-        image_np = np.array(image)
-        if image_np.shape[2] == 4:
-            rgb_data = image_np[:, :, :3]
-            alpha_data = image_np[:, :, 3]
-        else:
-            rgb_data = image_np
-            alpha_data = None
-
-        if alpha_data is not None:
-            gt_image = np.dstack((rgb_data, alpha_data))
-        else:
-            gt_image = rgb_data
-
-        gt_image_tensor = torch.tensor(gt_image, dtype=torch.float32).to(self.device)
-
-        return gt_image_tensor
-
-    def scene_info_from_model(self, render_var, t):
+    def scene_info_from_model(self, render_var, t):  # helper function for the get_image_from_pcd function
+                                                     # calcualtes new scene using the model and changing the means and rotation
         with torch.no_grad():
             delta_means, delta_rot = self.model_mlp(render_var['means3D'], render_var['rotations'], t=t)
             rendervar = render_var.copy()
@@ -99,6 +81,9 @@ class trainer:
         return rendervar
 
     def get_image_from_pcd(self, scene_info, meta, max_t, test=False):
+        # based on the visualization function from the dynamic3DGaussian code
+        # we take snapshots for a certain camera angle and save it in the test_pics folder
+        # rendering is done by thegaussian renderer referenced in the original dynamic3DGaussian repository
         if test:
             type = 'test'
         else:
@@ -181,6 +166,12 @@ class trainer:
         return
 
     def train_gaussian(self, max_t):
+        # training function
+        # separates between initial learning and successive learning
+        # initial learning is based on the original dynamic3DGaussian method
+        # successive learning iteration are done as described in the white paper
+        # for sinmplicity, we have tried to use the same dictionary formats for our iterations as well
+
         # just initializing the first gaussian splats self.based on the dynamic gaussian code
         md_train = json.load(open(f'dynamic_data/{self.base}/train_meta.json', 'r'))
         if max_t > len(md_train['fn']):
@@ -310,7 +301,7 @@ class trainer:
 
         # based on the visualize class of dynamic 3d gaussians
 
-    def get_dataset_test(self, t, md, seq):
+    def get_dataset_test(self, t, md, seq):  # do not need the seg images from the dataset for testing
         dataset = []
         for c in range(len(md['fn'][t])):
             w, h, k, w2c = md['w'], md['h'], md['k'][t][c], md['w2c'][t][c]
@@ -321,21 +312,10 @@ class trainer:
             dataset.append({'cam': cam, 'im': im, 'id': c})
         return dataset
 
-    def loss_after_init_test(self, params, curr_data, variables):
-        losses = {}
-
-        rendervar = params2rendervar(params)
-        im, radius, _, = Renderer(raster_settings=curr_data['cam'])(**rendervar)
-        curr_id = curr_data['id']
-        im = torch.exp(params['cam_m'][curr_id])[:, None, None] * im + params['cam_c'][curr_id][:, None, None]
-        losses['im'] = l1_loss_v1(im, curr_data['im'])
-        variables['means2D'] = rendervar['means2D']  # Gradient only accum from colour render for densification
-
-        loss_weights = {'im': 1.0}
-        loss = loss_weights['im'] * losses['im']
-        return loss, variables
-
-    def test_gaussian(self, max_t, model=None):
+    def test_gaussian(self, max_t, model=None): # separate function for testing
+                                                # ieratrions are pretty similar to training gaussians
+                                                # but there are slight modifications.
+                                                # for overview, we have defined another function
         if model is None:
             mlp_mod = self.model_mlp
         else:
@@ -405,7 +385,7 @@ class trainer:
                     old_quats = params_test['unnorm_rotations'].clone()
                     params_test['unnorm_rotations'] = self.quaternion_raw_mult(delta_quat, old_quats)
 
-                    loss_first, _ = self.loss_after_init_test(params_test, curr_data, variables_test)
+                    loss_first, _ = self.loss_after_init(params_test, curr_data, variables_test)
 
                     psnr_mean_t = 0
                     ssim_mean_t = 0
